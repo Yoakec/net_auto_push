@@ -1,0 +1,7 @@
+command,category
+show arp,Inventory
+show version,Inventory
+dis cu,Config
+display interface brief,System
+display ip routing-table,Route
+display vlan,VLAN

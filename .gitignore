@@ -1,2 +1,12 @@
 
 node_modules
+dist
+__pycache__
+*.pyc
+*.egg-info
+backup.py
+*.spec
+build
+.venv
+.vite
+

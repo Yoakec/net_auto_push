@@ -1,0 +1,4 @@
+ip,Type,username,password,Protocol,port,Area,encode
+192.168.1.1,Huawei,admin,admin123,ssh,22,IDC-A,utf-8
+192.168.1.2,Huawei,admin,admin123,ssh,22,IDC-A,utf-8
+192.168.1.3,Cisco,cisco,cisco123,ssh,22,IDC-B,utf-8
