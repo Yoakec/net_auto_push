@@ -8,12 +8,14 @@ import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 
-const props = defineProps({ taskId: String })
+const props = defineProps({
+  logs: { type: Array, default: () => [] },
+})
 
 const terminalContainer = ref(null)
 let term = null
 let fitAddon = null
-let ws = null
+let lastIdx = 0
 
 onMounted(() => {
   term = new Terminal({
@@ -57,49 +59,34 @@ onMounted(() => {
   term.writeln('\x1b[1;36m  Net Auto Push — Ready\x1b[0m')
   term.writeln('\x1b[1;36m══════════════════════════════════\x1b[0m')
   term.writeln('')
-
-  if (props.taskId) connect(props.taskId)
 })
 
-watch(() => props.taskId, (id) => {
-  if (id) connect(id)
-})
+watch(() => props.logs.length, () => {
+  while (lastIdx < props.logs.length) {
+    const entry = props.logs[lastIdx]
+    lastIdx++
 
-function connect(taskId) {
-  if (ws) { ws.close(); ws = null }
-  const protocol = location.protocol === 'https:' ? 'wss' : 'ws'
-  ws = new WebSocket(`${protocol}://${location.host}/ws/task/${taskId}`)
+    if (typeof entry === 'string') {
+      term.writeln(entry)
+      continue
+    }
 
-  ws.onopen = () => {
-    term.writeln(`\x1b[0;36m[WS]\x1b[0m Connected to task ${taskId}\n`)
-  }
+    let text = entry.text || ''
+    let colorCode = ''
+    if (entry.style === 'green') colorCode = '0;32'
+    else if (entry.style === 'red') colorCode = '0;31'
+    else if (entry.style === 'yellow') colorCode = '0;33'
+    else if (entry.style === 'green bold') colorCode = '1;32'
 
-  ws.onmessage = (event) => {
-    const msg = JSON.parse(event.data)
-    switch (msg.type) {
-      case 'device_start':
-        term.writeln(`\x1b[0;32m[OK]\x1b[0m [${msg.device_ip}] connected`)
-        break
-      case 'device_done':
-        term.writeln(`\x1b[0;32m[OK]\x1b[0m [${msg.device_ip}] done, ${msg.duration_ms}ms`)
-        break
-      case 'device_error':
-        term.writeln(`\x1b[0;31m[ERR]\x1b[0m [${msg.device_ip}] ${msg.error}`)
-        break
-      case 'task_progress':
-        term.writeln(`\x1b[0;33m[PROGRESS]\x1b[0m ${msg.completed}/${msg.total} done, ${msg.running} running, ${msg.failed} failed`)
-        break
-      case 'task_complete':
-        term.writeln(`\n\x1b[1;32m══════ Task complete: ${msg.success} success, ${msg.failed} failed ══════\x1b[0m`)
-        break
+    if (colorCode) {
+      term.writeln(`\x1b[${colorCode}m${text}\x1b[0m`)
+    } else {
+      term.writeln(text)
     }
   }
-
-  ws.onclose = () => { term.writeln('\x1b[0;33m[WS]\x1b[0m Disconnected') }
-}
+})
 
 onBeforeUnmount(() => {
-  if (ws) ws.close()
   if (term) term.dispose()
 })
 </script>

@@ -34,11 +34,6 @@ router = APIRouter()
 async def ws_task(ws: WebSocket, task_id: str):
     await ws.accept()
     ws_manager.register(task_id, ws)
-
-    # If task doesn't exist yet, send simulated logs (for testing the channel)
-    if task_id not in TASKS or TASKS[task_id].get("status") == "pending":
-        asyncio.create_task(_send_simulated_logs(ws, task_id))
-
     try:
         while True:
             await ws.receive_text()
@@ -46,21 +41,3 @@ async def ws_task(ws: WebSocket, task_id: str):
         pass
     finally:
         ws_manager.unregister(task_id, ws)
-
-
-async def _send_simulated_logs(ws: WebSocket, task_id: str):
-    """Send simulated event stream for testing WebSocket channel."""
-    try:
-        for i in range(1, 6):
-            await ws.send_json({"type": "task_progress", "total": 5, "completed": i, "running": 1, "failed": 0})
-            await ws.send_json({
-                "type": "device_output",
-                "device_ip": f"10.0.0.{i}",
-                "command": "show arp",
-                "data": f"Simulated output line {i}\n",
-                "stream": "stdout"
-            })
-            await asyncio.sleep(1)
-        await ws.send_json({"type": "task_complete", "total": 5, "success": 5, "failed": 0})
-    except Exception:
-        pass
