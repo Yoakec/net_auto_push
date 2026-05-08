@@ -1,0 +1,22 @@
+{
+  "task_id": "ae1a0867",
+  "started_at": "2026-05-08T15:44:32.169459",
+  "finished_at": "2026-05-08T15:44:32.169476",
+  "commands": [
+    "ip a"
+  ],
+  "devices": [
+    {
+      "ip": "192.168.179.200",
+      "type": "Centos",
+      "area": "IDC-B",
+      "status": "success",
+      "duration_ms": 15800
+    }
+  ],
+  "summary": {
+    "total": 1,
+    "success": 1,
+    "failed": 0
+  }
+}

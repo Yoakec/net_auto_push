@@ -66,20 +66,20 @@ backend/
 
 ```
 frontend/src/
-├── App.vue              # ALL core logic: Xterm.js terminal init, WebSocket handler, result cards (inline)
+├── App.vue              # ALL core logic: Xterm.js terminal init, WebSocket handler, result cards AND modal (both inline)
 └── components/
     ├── DeviceTable.vue  # Filterable device table (Area/Type dropdowns, IP search, checkboxes)
     ├── CommandInput.vue # Multi-line textarea, snippet dropdown (grouped by category), execute button
-    ├── OutputModal.vue  # Modal with Xterm.js instance for per-device pure command output, tab switching
     └── ProgressBar.vue  # Header progress bar
 ```
 
 **Layout**: 30/70 flex split. Left: DeviceTable + CommandInput. Right: Xterm.js main terminal (event log) + result cards strip at bottom.
 
 **Key architectural decisions**:
-- Terminal and result cards are **inline in App.vue**, not separate components. This was done intentionally after reactivity issues with prop-passing across component boundaries.
+- Terminal, result cards, and modal are ALL **inline in App.vue**, not separate components. This was done intentionally after reactivity issues with prop-passing across component boundaries.
 - Only **one WebSocket connection** exists (managed by App.vue). Never open a second WS inside a child component — it causes message duplication and state mismatches.
-- `deviceResults` uses `ref([])` (array ref), mutated with `.push()` and direct property assignment (`r.status = 'success'`). Do NOT use `reactive({})` with dynamic keys for result storage.
+- `deviceStates` uses `reactive({})` (keyed by device IP), which Vue 3 Proxy reliably tracks for dynamic key additions and nested mutations. Self-contained per device: `{ status, type, area, duration_ms, error, log, outputs: { cmd: data } }`.
+- Modal is rendered inline in App.vue with `v-if="isModalOpen"`, Xterm.js created in a `watch` on modal open, multi-command tabs via `activeModalTab` ref.
 
 **Vite dev proxy** (vite.config.js): `/api` → `http://localhost:8000`, `/ws` → `ws://localhost:8000`.
 

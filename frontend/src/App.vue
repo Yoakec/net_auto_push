@@ -31,24 +31,26 @@
       <main class="flex-1 flex flex-col overflow-hidden">
         <div ref="terminalContainer" class="flex-1 min-h-0 relative"></div>
 
-        <!-- Result cards inline -->
+        <!-- Result cards -->
         <div class="flex gap-2 p-3 overflow-x-auto shrink-0 min-h-[56px] border-t border-gray-800 bg-gray-900/50">
-          <template v-if="deviceResults.length">
+          <template v-if="Object.keys(deviceStates).length">
             <div
-              v-for="r in deviceResults"
-              :key="r.ip"
-              @click="openModal(r)"
+              v-for="(info, ip) in deviceStates"
+              :key="ip"
+              @click="openModal(ip)"
               class="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors shrink-0"
-              :class="r.status === 'success' ? 'bg-emerald-900/60 hover:bg-emerald-900 border border-emerald-600' :
-                       r.status === 'failed' ? 'bg-red-900/60 hover:bg-red-900 border border-red-600' :
-                       'bg-gray-700 border border-gray-600'"
+              :class="info.status === 'success'
+                ? 'bg-emerald-900/60 hover:bg-emerald-900 border border-emerald-600'
+                : info.status === 'failed' || info.status === 'error'
+                ? 'bg-red-900/60 hover:bg-red-900 border border-red-600'
+                : 'bg-gray-700 border border-gray-600'"
             >
-              <span class="text-lg">{{ r.status === 'success' ? '✓' : r.status === 'failed' ? '✗' : '⋯' }}</span>
+              <span class="text-lg">{{ info.status === 'success' ? '✓' : info.status === 'failed' || info.status === 'error' ? '✗' : '⋯' }}</span>
               <div>
-                <div class="text-sm font-mono text-gray-100">{{ r.ip }}</div>
+                <div class="text-sm font-mono text-gray-100">{{ ip }}</div>
                 <div class="text-xs text-gray-300">
-                  <template v-if="r.status === 'success'">{{ r.duration_ms }}ms</template>
-                  <template v-else-if="r.status === 'failed'">{{ r.error }}</template>
+                  <template v-if="info.status === 'success'">{{ info.duration_ms }}ms</template>
+                  <template v-else-if="info.status === 'failed' || info.status === 'error'">{{ info.error }}</template>
                   <template v-else>running...</template>
                 </div>
               </div>
@@ -61,47 +63,98 @@
       </main>
     </div>
 
-    <OutputModal
-      v-if="modalDevice"
-      :device="modalDevice"
-      :outputs="deviceOutputs[modalDevice.ip] || {}"
-      @close="modalDevice = null"
-    />
+    <!-- Modal -->
+    <div
+      v-if="isModalOpen"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
+      @click.self="closeModal"
+    >
+      <div class="bg-gray-900 border border-gray-700 rounded-lg w-[80vw] h-[70vh] flex flex-col shadow-2xl">
+        <div class="flex items-center justify-between px-4 py-3 border-b border-gray-800">
+          <h3 class="text-lg font-mono text-blue-300">{{ currentModalIp }}</h3>
+          <div class="flex items-center gap-2">
+            <button @click="copyModalLog" class="px-3 py-1 text-xs bg-gray-800 hover:bg-gray-700 rounded border border-gray-600 transition-colors">
+              Copy All
+            </button>
+            <button @click="exportModalLog" class="px-3 py-1 text-xs bg-gray-800 hover:bg-gray-700 rounded border border-gray-600 transition-colors">
+              Export TXT
+            </button>
+            <button @click="closeModal" class="text-gray-400 hover:text-white text-xl leading-none">&times;</button>
+          </div>
+        </div>
+
+        <!-- Tab bar for multi-command -->
+        <div class="flex gap-1 px-4 py-2 border-b border-gray-800" v-if="modalTabs.length > 1">
+          <button
+            v-for="cmd in modalTabs"
+            :key="cmd"
+            @click="activeModalTab = cmd"
+            class="px-3 py-1 text-xs rounded-t transition-colors"
+            :class="activeModalTab === cmd ? 'bg-gray-800 text-blue-300' : 'text-gray-500 hover:text-gray-300'"
+          >{{ cmd }}</button>
+        </div>
+
+        <div ref="modalTerminal" class="flex-1 min-h-0"></div>
+
+        <div class="flex gap-2 px-4 py-2 border-t border-gray-800 text-xs text-gray-500">
+          <span v-if="currentModalInfo?.duration_ms">Duration: {{ currentModalInfo.duration_ms }}ms</span>
+          <span :class="currentModalInfo?.status === 'failed' || currentModalInfo?.status === 'error' ? 'text-red-400' : ''">
+            Status: {{ currentModalInfo?.status || 'unknown' }}
+          </span>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 import DeviceTable from './components/DeviceTable.vue'
 import CommandInput from './components/CommandInput.vue'
-import OutputModal from './components/OutputModal.vue'
 import ProgressBar from './components/ProgressBar.vue'
 
+// ── Core state ──
 const devices = ref([])
 const snippets = ref([])
 const selectedIps = ref([])
 const maxConcurrent = ref(5)
 const currentTaskId = ref(null)
 
-const deviceResults = ref([])
-const deviceOutputs = ref({})
+// ── Device state dictionary (keyed by IP) ──
+// Format: { '10.1.1.22': { status, type, area, duration_ms, error, log, outputs: { cmd: data } } }
+const deviceStates = reactive({})
+
+// ── Modal state ──
+const isModalOpen = ref(false)
+const currentModalIp = ref('')
+const activeModalTab = ref('')
+const modalTerminal = ref(null)
+
+let modalTerm = null
+
+const currentModalInfo = computed(() => deviceStates[currentModalIp.value] || null)
+const modalTabs = computed(() => {
+  const info = currentModalInfo.value
+  return info?.outputs ? Object.keys(info.outputs) : []
+})
+
+// ── Terminal state ──
 const terminalLogs = ref([])
+const terminalContainer = ref(null)
 
 const totalDevices = ref(0)
 const completedDevices = ref(0)
 const failedDevices = ref(0)
-
-const terminalContainer = ref(null)
-const modalDevice = ref(null)
 
 let term = null
 let fitAddon = null
 let ws = null
 let lastLogIdx = 0
 
+// ── Main terminal ──
 onMounted(async () => {
   initTerminal()
   await loadInventory()
@@ -151,6 +204,7 @@ function writeLogs() {
   }
 }
 
+// ── Data loading ──
 async function loadInventory() {
   const res = await fetch('/api/inventory')
   devices.value = await res.json()
@@ -177,6 +231,7 @@ async function handleSnippetUpload(file) {
   if (res.ok) await loadSnippets()
 }
 
+// ── Execute ──
 async function handleExecute({ commands }) {
   if (!selectedIps.value.length || !commands.length) return
 
@@ -196,14 +251,17 @@ async function handleExecute({ commands }) {
   completedDevices.value = 0
   failedDevices.value = 0
 
-  deviceResults.value = []
-  deviceOutputs.value = {}
+  // Reset state
+  for (const key of Object.keys(deviceStates)) {
+    delete deviceStates[key]
+  }
   terminalLogs.value = []
   lastLogIdx = 0
 
   connectWebSocket(task_id)
 }
 
+// ── WebSocket ──
 function connectWebSocket(taskId) {
   if (ws) ws.close()
   const protocol = location.protocol === 'https:' ? 'wss' : 'ws'
@@ -219,53 +277,62 @@ function connectWebSocket(taskId) {
     const msg = JSON.parse(event.data)
     console.log('[WS] msg:', msg.type, msg)
 
+    const ip = msg.device_ip
+
     switch (msg.type) {
-      case 'device_start': {
-        const item = {
-          ip: msg.device_ip,
-          type: msg.device_type,
-          area: msg.area,
-          status: 'running',
-          duration_ms: null,
-          error: null,
+      case 'device_start':
+        if (!deviceStates[ip]) {
+          deviceStates[ip] = {
+            status: 'running',
+            type: msg.device_type || 'unknown',
+            area: msg.area || '',
+            duration_ms: null,
+            error: null,
+            log: '',
+            outputs: {},
+          }
+        } else {
+          deviceStates[ip].status = 'running'
         }
-        deviceResults.value.push(item)
-        console.log('[WS] deviceResults after push:', deviceResults.value.length)
-        terminalLogs.value.push({ text: `[OK] [${msg.device_ip}] connected`, style: 'green' })
+        terminalLogs.value.push({ text: `[OK] [${ip}] connected`, style: 'green' })
         writeLogs()
-        break
-      }
-      case 'device_output':
-        if (!deviceOutputs.value[msg.device_ip]) deviceOutputs.value[msg.device_ip] = {}
-        if (!deviceOutputs.value[msg.device_ip][msg.command]) deviceOutputs.value[msg.device_ip][msg.command] = ''
-        deviceOutputs.value[msg.device_ip][msg.command] += msg.data
         break
 
-      case 'device_done': {
-        const r = deviceResults.value.find(d => d.ip === msg.device_ip)
-        if (r) {
-          r.status = 'success'
-          r.duration_ms = msg.duration_ms
+      case 'device_output':
+        if (!deviceStates[ip]) {
+          deviceStates[ip] = { status: 'running', type: '?', area: '', duration_ms: null, error: null, log: '', outputs: {} }
+        }
+        if (!deviceStates[ip].outputs[msg.command]) {
+          deviceStates[ip].outputs[msg.command] = ''
+        }
+        deviceStates[ip].outputs[msg.command] += msg.data
+        deviceStates[ip].log += msg.data
+        break
+
+      case 'device_done':
+        if (deviceStates[ip]) {
+          deviceStates[ip].status = 'success'
+          deviceStates[ip].duration_ms = msg.duration_ms
         }
         completedDevices.value++
-        terminalLogs.value.push({ text: `[OK] [${msg.device_ip}] done, ${msg.duration_ms}ms`, style: 'green' })
+        terminalLogs.value.push({ text: `[OK] [${ip}] done, ${msg.duration_ms}ms`, style: 'green' })
         writeLogs()
         break
-      }
-      case 'device_error': {
-        let r = deviceResults.value.find(d => d.ip === msg.device_ip)
-        if (r) {
-          r.status = 'failed'
-          r.error = msg.error
+
+      case 'device_error':
+        if (!deviceStates[ip]) {
+          deviceStates[ip] = { status: 'error', type: '?', area: '', duration_ms: null, error: msg.error, log: '', outputs: {} }
         } else {
-          deviceResults.value.push({ ip: msg.device_ip, status: 'failed', error: msg.error, type: '?', area: '', duration_ms: null })
+          deviceStates[ip].status = 'error'
+          deviceStates[ip].error = msg.error
+          deviceStates[ip].log += `\n[ERROR]: ${msg.error}\n`
         }
         completedDevices.value++
         failedDevices.value++
-        terminalLogs.value.push({ text: `[ERR] [${msg.device_ip}] ${msg.error}`, style: 'red' })
+        terminalLogs.value.push({ text: `[ERR] [${ip}] ${msg.error}`, style: 'red' })
         writeLogs()
         break
-      }
+
       case 'task_progress':
         totalDevices.value = msg.total
         completedDevices.value = msg.completed
@@ -298,7 +365,103 @@ function connectWebSocket(taskId) {
   }
 }
 
-function openModal(device) {
-  modalDevice.value = device
+// ── Modal logic ──
+function openModal(ip) {
+  currentModalIp.value = ip
+  const info = deviceStates[ip]
+  if (info?.outputs) {
+    const tabs = Object.keys(info.outputs)
+    activeModalTab.value = tabs.length ? tabs[0] : ''
+  }
+  isModalOpen.value = true
 }
+
+function closeModal() {
+  isModalOpen.value = false
+  currentModalIp.value = ''
+  activeModalTab.value = ''
+}
+
+// Modal Xterm.js
+watch(isModalOpen, (open) => {
+  if (open) {
+    // Need to wait for DOM to render the modalTerminal ref
+    setTimeout(() => {
+      if (modalTerminal.value && !modalTerm) {
+        modalTerm = new Terminal({
+          theme: {
+            background: '#0f172a',
+            foreground: '#cbd5e1',
+          },
+          fontSize: 13,
+          fontFamily: '"Cascadia Code", "Fira Code", monospace',
+          disableStdin: true,
+        })
+        modalTerm.open(modalTerminal.value)
+
+        // Fit on resize
+        const observer = new ResizeObserver(() => {
+          try { modalTerm?.fit() } catch (e) { /* may not have fit addon */ }
+        })
+        observer.observe(modalTerminal.value)
+      }
+      writeModalOutput()
+    }, 50)
+  } else {
+    if (modalTerm) {
+      modalTerm.dispose()
+      modalTerm = null
+    }
+  }
+})
+
+watch(activeModalTab, () => writeModalOutput())
+
+function writeModalOutput() {
+  if (!modalTerm) return
+  modalTerm.clear()
+  const info = currentModalInfo.value
+  if (!info?.outputs) return
+  const data = info.outputs[activeModalTab.value] || ''
+  const lines = data.split('\n')
+  for (const line of lines) modalTerm.writeln(line)
+}
+
+function copyModalLog() {
+  const info = currentModalInfo.value
+  if (!info) return
+  let text
+  if (info.outputs && Object.keys(info.outputs).length) {
+    text = Object.entries(info.outputs)
+      .map(([cmd, data]) => `========== ${cmd} ==========\n${data}`)
+      .join('\n\n')
+  } else {
+    text = info.log || ''
+  }
+  navigator.clipboard.writeText(text)
+}
+
+function exportModalLog() {
+  const info = currentModalInfo.value
+  if (!info) return
+  let text
+  if (info.outputs && Object.keys(info.outputs).length) {
+    text = Object.entries(info.outputs)
+      .map(([cmd, data]) => `========== ${cmd} ==========\n${data}`)
+      .join('\n\n')
+  } else {
+    text = info.log || ''
+  }
+  const blob = new Blob([text], { type: 'text/plain' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${currentModalIp.value}_output.txt`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+onBeforeUnmount(() => {
+  if (modalTerm) modalTerm.dispose()
+})
 </script>
