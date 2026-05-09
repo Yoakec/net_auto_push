@@ -30,6 +30,7 @@ def archive_task(task_id: str, commands: list[str], device_results: list[dict]):
     for result in device_results:
         ip = result["ip"]
         dev = next((d for d in devices if d.ip == ip), None)
+        dev_nickname = dev.nickname if dev else ""
         dev_type = dev.type if dev else "unknown"
         area = dev.area if dev else ""
         status = result.get("status", "unknown")
@@ -42,6 +43,7 @@ def archive_task(task_id: str, commands: list[str], device_results: list[dict]):
 
         device_entries.append({
             "ip": ip,
+            "nickname": dev_nickname,
             "type": dev_type,
             "area": area,
             "status": status,
@@ -50,7 +52,7 @@ def archive_task(task_id: str, commands: list[str], device_results: list[dict]):
 
         # Generate device Markdown file
         md_path = os.path.join(archive_dir, f"{ip}_{dev_type}.md")
-        _write_device_md(md_path, ip, dev_type, area, result, commands)
+        _write_device_md(md_path, ip, dev_nickname, dev_type, area, result, commands)
 
     # Generate task_summary.json
     summary = {
@@ -73,11 +75,14 @@ def archive_task(task_id: str, commands: list[str], device_results: list[dict]):
     return archive_dir
 
 
-def _write_device_md(path: str, ip: str, dev_type: str, area: str, result: dict, commands: list[str]):
+def _write_device_md(path: str, ip: str, nickname: str, dev_type: str, area: str, result: dict, commands: list[str]):
     """Write a per-device Markdown file organized by command."""
     lines = []
-    lines.append(f"# {ip} ({dev_type})")
+    title = f"# {nickname} ({ip}, {dev_type})" if nickname else f"# {ip} ({dev_type})"
+    lines.append(title)
     lines.append("")
+    if nickname:
+        lines.append(f"- **Nickname**: {nickname}")
     lines.append(f"- **Area**: {area}")
     lines.append(f"- **Status**: {result.get('status', 'unknown')}")
     lines.append(f"- **Duration**: {result.get('duration_ms', 0)}ms")

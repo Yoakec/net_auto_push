@@ -35,6 +35,7 @@ def _parse_csv(path: str) -> List[Device]:
             if not str(row.get('ip', '')).strip():
                 continue
             rows.append(Device(
+                nickname=str(row.get('nickname', '')).strip(),
                 ip=str(row['ip']).strip(),
                 type=str(row.get('Type', row.get('type', ''))).strip(),
                 username=str(row.get('username', '')).strip(),
@@ -51,6 +52,7 @@ def _parse_csv(path: str) -> List[Device]:
 
 def _to_response(d: Device) -> dict:
     return {
+        "nickname": d.nickname,
         "ip": d.ip,
         "type": d.type,
         "username": d.username,

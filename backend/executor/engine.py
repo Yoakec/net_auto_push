@@ -27,6 +27,7 @@ async def run_task(task_id: str, device_ips: list[str], commands: list[str], max
             await ws_manager.send(task_id, {
                 "type": "device_start",
                 "device_ip": ip,
+                "device_nickname": dev.nickname if dev else "",
                 "device_type": dev.type if dev else "unknown",
                 "area": dev.area if dev else "",
             })
@@ -47,6 +48,7 @@ async def run_task(task_id: str, device_ips: list[str], commands: list[str], max
                 await ws_manager.send(task_id, {
                     "type": "device_done",
                     "device_ip": ip,
+                    "device_nickname": dev.nickname if dev else "",
                     "status": "success",
                     "duration_ms": result["duration_ms"],
                 })
@@ -54,6 +56,7 @@ async def run_task(task_id: str, device_ips: list[str], commands: list[str], max
                 await ws_manager.send(task_id, {
                     "type": "device_error",
                     "device_ip": ip,
+                    "device_nickname": dev.nickname if dev else "",
                     "error": result["error"],
                 })
                 failed += 1

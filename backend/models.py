@@ -3,6 +3,7 @@ from typing import Optional, List
 
 
 class Device(BaseModel):
+    nickname: str = ""
     ip: str
     type: str
     username: str
@@ -14,6 +15,7 @@ class Device(BaseModel):
 
 
 class DeviceResponse(BaseModel):
+    nickname: str = ""
     ip: str
     type: str
     username: str

@@ -1,0 +1,29 @@
+{
+  "task_id": "69bd8ff9",
+  "started_at": "2026-05-09T10:17:33.169858",
+  "finished_at": "2026-05-09T10:17:33.169866",
+  "commands": [
+    "dis cu"
+  ],
+  "devices": [
+    {
+      "ip": "192.168.179.3",
+      "type": "Huawei",
+      "area": "IDC-A",
+      "status": "success",
+      "duration_ms": 3162
+    },
+    {
+      "ip": "192.168.179.2",
+      "type": "Huawei",
+      "area": "IDC-A",
+      "status": "success",
+      "duration_ms": 3545
+    }
+  ],
+  "summary": {
+    "total": 2,
+    "success": 2,
+    "failed": 0
+  }
+}

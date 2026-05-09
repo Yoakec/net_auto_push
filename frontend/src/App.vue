@@ -47,7 +47,8 @@
             >
               <span class="text-lg">{{ info.status === 'success' ? '✓' : info.status === 'failed' || info.status === 'error' ? '✗' : '⋯' }}</span>
               <div>
-                <div class="text-sm font-mono text-gray-100">{{ ip }}</div>
+                <div class="text-sm font-mono text-gray-100">{{ displayLabel(ip) }}</div>
+                <div v-if="info.nickname" class="text-xs text-gray-500 font-mono">{{ ip }}</div>
                 <div class="text-xs text-gray-300">
                   <template v-if="info.status === 'success'">{{ info.duration_ms }}ms</template>
                   <template v-else-if="info.status === 'failed' || info.status === 'error'">{{ info.error }}</template>
@@ -71,7 +72,10 @@
     >
       <div class="bg-gray-900 border border-gray-700 rounded-lg w-[80vw] h-[70vh] flex flex-col shadow-2xl">
         <div class="flex items-center justify-between px-4 py-3 border-b border-gray-800">
-          <h3 class="text-lg font-mono text-blue-300">{{ currentModalIp }}</h3>
+          <div>
+            <h3 class="text-lg font-mono text-blue-300">{{ displayLabel(currentModalIp) }}</h3>
+            <p v-if="currentModalInfo?.nickname" class="text-xs text-gray-500 font-mono">{{ currentModalIp }}</p>
+          </div>
           <div class="flex items-center gap-2">
             <button @click="copyModalLog" class="px-3 py-1 text-xs bg-gray-800 hover:bg-gray-700 rounded border border-gray-600 transition-colors">
               Copy All
@@ -136,6 +140,11 @@ const modalTerminal = ref(null)
 let modalTerm = null
 
 const currentModalInfo = computed(() => deviceStates[currentModalIp.value] || null)
+
+function displayLabel(ip) {
+  const info = deviceStates[ip]
+  return (info?.nickname) || ip
+}
 const modalTabs = computed(() => {
   const info = currentModalInfo.value
   return info?.outputs ? Object.keys(info.outputs) : []
@@ -284,6 +293,7 @@ function connectWebSocket(taskId) {
         if (!deviceStates[ip]) {
           deviceStates[ip] = {
             status: 'running',
+            nickname: msg.device_nickname || '',
             type: msg.device_type || 'unknown',
             area: msg.area || '',
             duration_ms: null,
@@ -293,8 +303,9 @@ function connectWebSocket(taskId) {
           }
         } else {
           deviceStates[ip].status = 'running'
+          if (msg.device_nickname) deviceStates[ip].nickname = msg.device_nickname
         }
-        terminalLogs.value.push({ text: `[OK] [${ip}] connected`, style: 'green' })
+        terminalLogs.value.push({ text: `[OK] [${displayLabel(ip)}] connected`, style: 'green' })
         writeLogs()
         break
 
@@ -313,23 +324,25 @@ function connectWebSocket(taskId) {
         if (deviceStates[ip]) {
           deviceStates[ip].status = 'success'
           deviceStates[ip].duration_ms = msg.duration_ms
+          if (msg.device_nickname) deviceStates[ip].nickname = msg.device_nickname
         }
         completedDevices.value++
-        terminalLogs.value.push({ text: `[OK] [${ip}] done, ${msg.duration_ms}ms`, style: 'green' })
+        terminalLogs.value.push({ text: `[OK] [${displayLabel(ip)}] done, ${msg.duration_ms}ms`, style: 'green' })
         writeLogs()
         break
 
       case 'device_error':
         if (!deviceStates[ip]) {
-          deviceStates[ip] = { status: 'error', type: '?', area: '', duration_ms: null, error: msg.error, log: '', outputs: {} }
+          deviceStates[ip] = { status: 'error', nickname: msg.device_nickname || '', type: '?', area: '', duration_ms: null, error: msg.error, log: '', outputs: {} }
         } else {
           deviceStates[ip].status = 'error'
           deviceStates[ip].error = msg.error
+          if (msg.device_nickname) deviceStates[ip].nickname = msg.device_nickname
           deviceStates[ip].log += `\n[ERROR]: ${msg.error}\n`
         }
         completedDevices.value++
         failedDevices.value++
-        terminalLogs.value.push({ text: `[ERR] [${ip}] ${msg.error}`, style: 'red' })
+        terminalLogs.value.push({ text: `[ERR] [${displayLabel(ip)}] ${msg.error}`, style: 'red' })
         writeLogs()
         break
 
@@ -456,7 +469,8 @@ function exportModalLog() {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `${currentModalIp.value}_output.txt`
+  const exportName = displayLabel(currentModalIp.value).replace(/[^a-zA-Z0-9一-鿿_-]/g, '_')
+  a.download = `${exportName}_output.txt`
   a.click()
   URL.revokeObjectURL(url)
 }

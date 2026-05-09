@@ -1,0 +1,31 @@
+{
+  "task_id": "d2244e58",
+  "started_at": "2026-05-09T11:28:40.287366",
+  "finished_at": "2026-05-09T11:28:40.287373",
+  "commands": [
+    "dis cu"
+  ],
+  "devices": [
+    {
+      "ip": "192.168.179.3",
+      "nickname": "SW02",
+      "type": "Huawei",
+      "area": "IDC-A",
+      "status": "failed",
+      "duration_ms": 3095
+    },
+    {
+      "ip": "192.168.179.2",
+      "nickname": "SW01",
+      "type": "Huawei",
+      "area": "IDC-A",
+      "status": "success",
+      "duration_ms": 3406
+    }
+  ],
+  "summary": {
+    "total": 2,
+    "success": 1,
+    "failed": 1
+  }
+}

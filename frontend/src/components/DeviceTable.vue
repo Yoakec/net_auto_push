@@ -14,7 +14,7 @@
       <input
         v-model="searchText"
         type="text"
-        placeholder="Search IP..."
+        placeholder="Search..."
         class="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs flex-1 placeholder-gray-600"
       />
     </div>
@@ -34,6 +34,7 @@
         <thead class="sticky top-0 bg-gray-900">
           <tr class="text-gray-500 text-left">
             <th class="w-8 p-1"></th>
+            <th class="p-1">Name</th>
             <th class="p-1">IP</th>
             <th class="p-1">Type</th>
             <th class="p-1">Area</th>
@@ -50,6 +51,7 @@
             <td class="p-1">
               <input type="checkbox" :checked="selected.includes(d.ip)" class="rounded" />
             </td>
+            <td class="p-1 text-blue-200">{{ d.nickname || d.ip }}</td>
             <td class="p-1 font-mono text-blue-300">{{ d.ip }}</td>
             <td class="p-1 text-gray-300">{{ d.type }}</td>
             <td class="p-1 text-gray-400">{{ d.area }}</td>
@@ -91,7 +93,7 @@ const filteredDevices = computed(() => {
   return props.devices.filter(d => {
     if (filterArea.value && d.area !== filterArea.value) return false
     if (filterType.value && d.type !== filterType.value) return false
-    if (searchText.value && !d.ip.includes(searchText.value)) return false
+    if (searchText.value && !d.ip.includes(searchText.value) && !(d.nickname || '').includes(searchText.value)) return false
     return true
   })
 })
