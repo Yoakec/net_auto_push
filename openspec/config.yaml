@@ -1,20 +1,11 @@
 schema: spec-driven
 
-# Project context (optional)
-# This is shown to AI when creating artifacts.
-# Add your tech stack, conventions, style guides, domain knowledge, etc.
-# Example:
-#   context: |
-#     Tech stack: TypeScript, React, Node.js
-#     We use conventional commits
-#     Domain: e-commerce platform
-
-# Per-artifact rules (optional)
-# Add custom rules for specific artifacts.
-# Example:
-#   rules:
-#     proposal:
-#       - Keep proposals under 500 words
-#       - Always include a "Non-goals" section
-#     tasks:
-#       - Break tasks into chunks of max 2 hours
+context: |
+  Net Auto Push — 华为/Cisco 交换机批量 SSH 命令执行工具。
+  单人单机 Windows 桌面工具，无数据库。
+  Tech stack: Python 3.12 (FastAPI + uvicorn + netmiko + pandas),
+  Vue 3 + Vite + Tailwind CSS + Xterm.js.
+  部署: PyInstaller 单 .exe 打包。
+  Code conventions: backend 模块级列表用 clear()+extend() 原地修改，不重新赋值。
+  前端只有一个 WebSocket 连接（App.vue 管理），子组件不开独立 WS。
+  密码字段在 API 响应中脱敏，前端不展示 password 列。
